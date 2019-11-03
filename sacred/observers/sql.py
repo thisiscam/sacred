@@ -79,12 +79,9 @@ class SqlObserver(RunObserver):
         Base.metadata.create_all(self.engine)
         sql_exp = Experiment.get_or_create(ex_info, self.session)
         sql_host = Host.get_or_create(host_info, self.session)
-        if _id is None:
-            i = self.session.query(Run).order_by(Run.id.desc()).first()
-            _id = 0 if i is None else i.id + 1
-
+        
         self.run = Run(
-            run_id=str(_id),
+            run_id=None,
             config=json.dumps(flatten(config)),
             command=command,
             priority=meta_info.get("priority", 0),
@@ -94,7 +91,12 @@ class SqlObserver(RunObserver):
             status=status,
             **kwargs,
         )
+
         self.session.add(self.run)
+        self.session.flush()
+        # Mirror run_id to an incrementing integer string
+        self.session.refresh(self.run)
+        self.run.run_id = str(self.run.id)
         self.save()
         return _id or self.run.run_id
 
